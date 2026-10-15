@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Enes War Zone</title>
+<meta name="theme-color" content="#17252b">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.png" type="image/png">
+<style>
+*{box-sizing:border-box}body{margin:0;background:#101a20;color:#fff;font-family:system-ui,Arial;touch-action:manipulation}
+#app{max-width:520px;margin:auto;background:#17252b;min-height:100dvh;display:flex;flex-direction:column}
+header{display:flex;justify-content:space-between;align-items:center;padding:12px;font-weight:900;background:#203139}
+.stats{display:flex;gap:10px;align-items:center;padding:8px 12px;font-size:13px}.bar{height:10px;flex:1;background:#51383b;border-radius:9px;overflow:hidden}.bar div{height:100%;width:100%;background:#52e68b}
+#stage{position:relative;width:100%;}canvas{display:block;width:100%;height:auto;touch-action:none}
+.overlay{position:absolute;inset:0;background:#07110de8;display:flex;align-items:center;justify-content:center;text-align:center;padding:22px}.overlay h1{font-size:28px;margin:8px}.overlay p{line-height:1.5}
+button{border:0;border-radius:12px;padding:14px 20px;font-weight:900;font-size:17px;background:#f3b82e;color:#172026}
+.controls{display:flex;justify-content:space-between;align-items:center;padding:12px;gap:12px}.hint{font-size:11px;text-align:center;color:#c2d0d0;line-height:1.5}
+#joy{width:112px;height:112px;flex-shrink:0;border-radius:50%;background:#35484e;border:2px solid #668087;position:relative;touch-action:none}
+#knob{position:absolute;width:42px;height:42px;border-radius:50%;background:#c3dddd;left:33px;top:33px;box-shadow:0 2px 8px #0008}
+#fire{width:96px;height:96px;flex-shrink:0;border-radius:50%;border:3px solid #ff9383;background:#c83d35;color:white;touch-action:none}
+footer{padding:0 12px 14px;text-align:center;font-size:12px;color:#b9cdcd}
+</style></head>
+<body><main id="app">
+<header><span>⚔️ ENES WAR ZONE</span><span id="score">SKOR 0</span></header>
+<div class="stats"><span>❤️ CAN</span><div class="bar"><div id="hp"></div></div><span id="wave">DALGA 1</span></div>
+<div id="stage"><canvas id="game" width="720" height="880"></canvas>
+<div class="overlay" id="intro"><div><div style="font-size:42px">🪖</div><h1>ENES WAR ZONE</h1><p>3D tarzı savaş arenası<br>Düşman dalgalarına karşı savaş ve rekor kır!</p><button id="start">▶ SAVAŞA BAŞLA</button></div></div>
+<div class="overlay" id="over" style="display:none"><div><h1>🏁 SAVAŞ BİTTİ</h1><p id="result"></p><button id="restart">↻ TEKRAR OYNA</button></div></div>
+</div>
+<div class="controls"><div id="joy"><div id="knob"></div></div><div class="hint">SOL JOYSTICK<br>HAREKET ET<br><br>Enes'i hareket ettir,<br>düşmanlardan kaç!</div><button id="fire">🔥<br>ATEŞ</button></div>
+<footer>Hareket ederken ateş et • Canını koru • Her 100 puanda yeni dalga!</footer>
+</main>
+<script>
+(()=> {
+const c=document.querySelector('#game'),g=c.getContext('2d'),W=360,H=440;
+let p,foes,shots,enemyShots,score,wave,running=false,last=0,elapsed=0,spawn=0,fireDelay=0,joyX=0,joyY=0,firing=false,keys={},time=0;
+const $=s=>document.querySelector(s);
+function start(){p={x:180,y:345,hp:100,inv:0};foes=[];shots=[];enemyShots=[];score=0;wave=1;spawn=0;fireDelay=0;elapsed=0;time=0;last=0;running=true;$('#intro').style.display='none';$('#over').style.display='none';requestAnimationFrame(loop)}
+function addEnemy(){foes.push({x:25+Math.random()*310,y:45+Math.random()*70,hp:2,speed:18+Math.random()*14+wave*2,phase:Math.random()*6,shot:1+Math.random()*2})}
+function shoot(){if(!running)return;let e=foes.filter(a=>a.hp>0).sort((a,b)=>Math.hypot(a.x-p.x,a.y-p.y)-Math.hypot(b.x-p.x,b.y-p.y))[0];let dx=e?e.x-p.x:0,dy=e?e.y-p.y:-1,d=Math.hypot(dx,dy)||1;shots.push({x:p.x,y:p.y-14,vx:dx/d*270,vy:dy/d*270,life:1.5})}
+function loop(t){if(!running)return;let dt=Math.min((t-last)/1000||.016,.04);last=t;time+=dt;update(dt);draw();if(running)requestAnimationFrame(loop)}
+function update(dt){
+ wave=1+Math.floor(score/100);spawn-=dt;if(spawn<=0&&foes.length<Math.min(5+wave,12)){addEnemy();spawn=Math.max(.45,1.35-wave*.07)}
+ p.inv=Math.max(0,p.inv-dt);let dx=joyX,dy=joyY;if(keys.ArrowLeft||keys.a)dx--;if(keys.ArrowRight||keys.d)dx++;if(keys.ArrowUp||keys.w)dy--;if(keys.ArrowDown||keys.s)dy++;
+ let m=Math.hypot(dx,dy)||1;p.x=Math.max(16,Math.min(344,p.x+dx/m*145*dt));p.y=Math.max(185,Math.min(410,p.y+dy/m*145*dt));
+ fireDelay-=dt;if(firing&&fireDelay<=0){shoot();fireDelay=.24}
+ for(let b of shots){b.x+=b.vx*dt;b.y+=b.vy*dt;b.life-=dt;for(let e of foes){if(e.hp>0&&Math.hypot(e.x-b.x,e.y-b.y)<17){e.hp--;b.life=0;if(e.hp<=0)score+=25;break}}}
+ shots=shots.filter(b=>b.life>0&&b.y>-10&&b.x>-10&&b.x<370);
+ for(let e of foes){e.phase+=dt*2;e.x+=Math.sin(e.phase)*23*dt;e.y+=e.speed*dt;e.shot-=dt;if(e.shot<=0&&e.y<p.y-25){let ax=p.x-e.x,ay=p.y-e.y,d=Math.hypot(ax,ay)||1;enemyShots.push({x:e.x,y:e.y+10,vx:ax/d*105,vy:ay/d*105});e.shot=1.8+Math.random()*1.4}if(e.y>H+10){e.y=35;e.x=30+Math.random()*300;p.hp-=8}}
+ foes=foes.filter(e=>e.hp>0);
+ for(let b of enemyShots){b.x+=b.vx*dt;b.y+=b.vy*dt;if(p.inv<=0&&Math.hypot(b.x-p.x,b.y-p.y)<15){p.hp-=12;p.inv=.45;b.y=500}}
+ enemyShots=enemyShots.filter(b=>b.y<H+5&&b.x>-5&&b.x<W+5);
+ $('#score').textContent='SKOR '+score;$('#hp').style.width=Math.max(0,p.hp)+'%';$('#wave').textContent='DALGA '+wave;if(p.hp<=0){running=false;$('#over').style.display='flex';$('#result').textContent='Enes, skorun: '+score}
+}
+function draw(){
+ g.clearRect(0,0,720,880);let bg=g.createLinearGradient(0,0,0,880);bg.addColorStop(0,'#435950');bg.addColorStop(1,'#182c2c');g.fillStyle=bg;g.fillRect(0,0,720,880);
+ g.save();g.scale(2,2);g.strokeStyle='#ffffff12';for(let y=(time*22)%40-40;y<H;y+=40){g.beginPath();g.moveTo(0,y);g.lineTo(W,y);g.stroke()}for(let x=0;x<W;x+=40){g.beginPath();g.moveTo(x,0);g.lineTo(x,H);g.stroke()}
+ for(let i=0;i<9;i++){let x=(i*71+23)%W,y=(i*103+35)%H;g.fillStyle='#111b1b55';g.fillRect(x,y,12,7);g.fillStyle='#8ba09522';g.fillRect(x+2,y+1,8,2)}
+ function soldier(x,y,isEnemy){g.save();g.translate(x,y);g.fillStyle='#0006';g.beginPath();g.ellipse(0,10,13,6,0,0,Math.PI*2);g.fill();g.fillStyle=isEnemy?'#a93c35':'#327bd3';g.fillRect(-9,-10,18,18);g.fillStyle=isEnemy?'#572b28':'#234b6b';g.fillRect(-8,1,6,12);g.fillRect(2,1,6,12);g.fillStyle='#dfc49a';g.beginPath();g.arc(0,-15,8,0,Math.PI*2);g.fill();g.fillStyle=isEnemy?'#71332d':'#1c4b50';g.beginPath();g.arc(0,-18,9,Math.PI,Math.PI*2);g.fill();g.fillRect(-9,-18,18,4);g.fillStyle='#202629';g.fillRect(5,-11,15,5);g.fillStyle='#bfc9c5';g.fillRect(16,-12,5,3);g.restore()}
+ for(let e of foes){soldier(e.x,e.y,true);g.fillStyle='#211e20';g.fillRect(e.x-12,e.y-29,24,4);g.fillStyle='#f06050';g.fillRect(e.x-12,e.y-29,24*Math.max(0,e.hp)/2,4)}
+ for(let b of shots){g.fillStyle='#ffe27c';g.beginPath();g.arc(b.x,b.y,3,0,7);g.fill()}for(let b of enemyShots){g.fillStyle='#ff6858';g.beginPath();g.arc(b.x,b.y,4,0,7);g.fill()}
+ if(p&&(p.inv===0||Math.floor(time*18)%2===0)){soldier(p.x,p.y,false);g.fillStyle='#fff';g.font='bold 11px system-ui';g.textAlign='center';g.fillText('ENES',p.x,p.y+27)}g.restore()
+}
+const joy=$('#joy'),knob=$('#knob');let pointer=null;
+function setJoy(e){let r=joy.getBoundingClientRect(),x=e.clientX-(r.left+r.width/2),y=e.clientY-(r.top+r.height/2),d=Math.hypot(x,y),max=35;if(d>max){x=x/d*max;y=y/d*max}joyX=x/max;joyY=y/max;knob.style.left=(33+x)+'px';knob.style.top=(33+y)+'px'}
+joy.addEventListener('pointerdown',e=>{pointer=e.pointerId;joy.setPointerCapture(pointer);setJoy(e)});joy.addEventListener('pointermove',e=>{if(pointer===e.pointerId)setJoy(e)});function release(e){if(pointer===e.pointerId){pointer=null;joyX=joyY=0;knob.style.left='33px';knob.style.top='33px'}}joy.addEventListener('pointerup',release);joy.addEventListener('pointercancel',release);
+$('#fire').addEventListener('pointerdown',e=>{e.preventDefault();firing=true;shoot()});for(let ev of ['pointerup','pointercancel','pointerleave'])$('#fire').addEventListener(ev,()=>firing=false);
+$('#start').addEventListener('click',start);$('#restart').addEventListener('click',start);
+window.addEventListener('keydown',e=>{keys[e.key]=true;if(e.key===' '){e.preventDefault();firing=true}});window.addEventListener('keyup',e=>{keys[e.key]=false;if(e.key===' ')firing=false});
+draw();
+})();
+</script><script>
+if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
+  window.addEventListener('load', () => navigator.serviceWorker.register('./sw.js').catch(()=>{}));
+}
+</script>
+</body></html>
